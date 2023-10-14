@@ -411,16 +411,19 @@ int send_safer(conn_info_t &conn_info, char type, const char *data, int len)  //
 
     memcpy(send_data_buf + sizeof(n_tmp_id), &n_tmp_id, sizeof(n_tmp_id));
 
-    anti_replay_seq_t n_seq = hton64(conn_info.blob->anti_replay.get_new_seq_for_send());
+    int replay_overhead = 0;
+    if(!disable_anti_replay) {
+        anti_replay_seq_t n_seq = hton64(conn_info.blob->anti_replay.get_new_seq_for_send());
+        memcpy(send_data_buf + sizeof(n_tmp_id) * 2, &n_seq, sizeof(n_seq));
+        replay_overhead = sizeof(n_seq);
+    }
 
-    memcpy(send_data_buf + sizeof(n_tmp_id) * 2, &n_seq, sizeof(n_seq));
+    send_data_buf[sizeof(n_tmp_id) * 2 + replay_overhead] = type;
+    send_data_buf[sizeof(n_tmp_id) * 2 + replay_overhead + 1] = conn_info.my_roller;
 
-    send_data_buf[sizeof(n_tmp_id) * 2 + sizeof(n_seq)] = type;
-    send_data_buf[sizeof(n_tmp_id) * 2 + sizeof(n_seq) + 1] = conn_info.my_roller;
+    memcpy(send_data_buf + 2 + sizeof(n_tmp_id) * 2 + replay_overhead, data, len);  // data;
 
-    memcpy(send_data_buf + 2 + sizeof(n_tmp_id) * 2 + sizeof(n_seq), data, len);  // data;
-
-    int new_len = len + sizeof(n_seq) + sizeof(n_tmp_id) * 2 + 2;
+    int new_len = len + replay_overhead + sizeof(n_tmp_id) * 2 + 2;
 
     if (g_fix_gro == 0) {
         if (my_encrypt(send_data_buf, send_data_buf2, new_len) != 0) {
@@ -482,24 +485,29 @@ int reserved_parse_safer(conn_info_t &conn_info, const char *input, int input_le
     memcpy(&h_my_id, recv_data_buf + sizeof(my_id_t), sizeof(h_my_id));
     h_my_id = ntohl(h_my_id);
 
-    // anti_replay_seq_t h_seq= ntoh64 (  *((anti_replay_seq_t * )(recv_data_buf  +sizeof(id_t) *2 ))   );
-    anti_replay_seq_t h_seq;
-    memcpy(&h_seq, recv_data_buf + sizeof(my_id_t) * 2, sizeof(h_seq));
-    h_seq = ntoh64(h_seq);
-
     if (h_oppsite_id != conn_info.oppsite_id || h_my_id != conn_info.my_id) {
         mylog(log_debug, "id and oppsite_id verification failed %x %x %x %x \n", h_oppsite_id, conn_info.oppsite_id, h_my_id, conn_info.my_id);
         return -1;
     }
 
-    if (conn_info.blob->anti_replay.is_vaild(h_seq) != 1) {
-        mylog(log_debug, "dropped replay packet\n");
-        return -1;
+    int replay_overhead = 0;
+    if(!disable_anti_replay) {
+        // anti_replay_seq_t h_seq= ntoh64 (  *((anti_replay_seq_t * )(recv_data_buf  +sizeof(id_t) *2 ))   );
+        anti_replay_seq_t h_seq;
+        memcpy(&h_seq, recv_data_buf + sizeof(my_id_t) * 2, sizeof(h_seq));
+        h_seq = ntoh64(h_seq);
+
+        if (conn_info.blob->anti_replay.is_vaild(h_seq) != 1) {
+            mylog(log_debug, "dropped replay packet\n");
+            return -1;
+        }
+
+        replay_overhead = sizeof(anti_replay_seq_t);
     }
 
     // printf("recv _len %d\n ",recv_len);
-    data = recv_data_buf + sizeof(anti_replay_seq_t) + sizeof(my_id_t) * 2;
-    len = input_len - (sizeof(anti_replay_seq_t) + sizeof(my_id_t) * 2);
+    data = recv_data_buf + replay_overhead + sizeof(my_id_t) * 2;
+    len = input_len - (replay_overhead + sizeof(my_id_t) * 2);
 
     if (data[0] != 'h' && data[0] != 'd') {
         mylog(log_debug, "first byte is not h or d  ,%x\n", data[0]);
