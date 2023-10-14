@@ -114,7 +114,7 @@ char *address_t::get_str() {
 }
 void address_t::to_str(char *s) {
     // static char res[max_addr_len];
-    char ip_addr[max_addr_len];
+    char ip_addr[INET6_ADDRSTRLEN];
     u32_t port;
     const char *ret = 0;
     if (get_type() == AF_INET6) {
@@ -135,7 +135,7 @@ void address_t::to_str(char *s) {
 
     port = ntohs(port);
 
-    ip_addr[max_addr_len - 1] = 0;
+    ip_addr[sizeof(ip_addr) - 1] = 0;
     if (get_type() == AF_INET6) {
         sprintf(s, "[%s]:%u", ip_addr, (u32_t)port);
     } else {

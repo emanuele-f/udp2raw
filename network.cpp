@@ -1065,7 +1065,7 @@ int send_raw_packet(raw_info_t &raw_info, const char *packet, int len) {
     const packet_info_t &send_info = raw_info.send_info;
     const packet_info_t &recv_info = raw_info.recv_info;
 
-    int ret;
+    int ret = -1;
     if (lower_level == 0) {
         if (raw_ip_version == AF_INET) {
             struct sockaddr_in sin = {0};
