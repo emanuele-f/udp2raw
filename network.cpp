@@ -9,6 +9,9 @@
 #include "log.h"
 #include "misc.h"
 
+// reduce TCP header size from 32 B to 20 B
+#define SLIM_TCP_HEADER
+
 int g_fix_gro = 0;
 
 int raw_recv_fd = -1;
@@ -1651,7 +1654,6 @@ int send_raw_tcp(raw_info_t &raw_info, const char *payload, int payloadlen) {  /
     tcph->ack = send_info.ack;
 
     if (tcph->syn == 1) {
-        tcph->doff = 10;  // tcp header size
         int i = sizeof(my_tcphdr);
         send_raw_tcp_buf[i++] = 0x02;  // mss
         send_raw_tcp_buf[i++] = 0x04;
@@ -1663,6 +1665,8 @@ int send_raw_tcp(raw_info_t &raw_info, const char *payload, int payloadlen) {  /
         send_raw_tcp_buf[i++] = 0x04;  // sack ok
         send_raw_tcp_buf[i++] = 0x02;  // sack ok
 
+#ifndef SLIM_TCP_HEADER
+        tcph->doff = 10;  // tcp header size 
         send_raw_tcp_buf[i++] = 0x08;  // ts   i=6
         send_raw_tcp_buf[i++] = 0x0a;  // i=7
 
@@ -1681,12 +1685,18 @@ int send_raw_tcp(raw_info_t &raw_info, const char *payload, int payloadlen) {  /
         memcpy(&send_raw_tcp_buf[i], &ts_ack, sizeof(ts_ack));
 
         i += 4;
+#else
+        tcph->doff = 8;  // tcp header size 
+        send_raw_tcp_buf[i++] = 0x01;
+        send_raw_tcp_buf[i++] = 0x01;
+#endif
 
         send_raw_tcp_buf[i++] = 0x01;
         send_raw_tcp_buf[i++] = 0x03;
         send_raw_tcp_buf[i++] = 0x03;
         send_raw_tcp_buf[i++] = wscale;
     } else {
+#ifndef SLIM_TCP_HEADER
         tcph->doff = 8;
         int i = sizeof(my_tcphdr);
 
@@ -1710,6 +1720,9 @@ int send_raw_tcp(raw_info_t &raw_info, const char *payload, int payloadlen) {  /
         u32_t ts_ack = htonl(send_info.ts_ack);
         memcpy(&send_raw_tcp_buf[i], &ts_ack, sizeof(ts_ack));
         i += 4;
+#else
+    tcph->doff = 5;
+#endif
     }
 
     tcph->urg = 0;
