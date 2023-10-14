@@ -182,7 +182,10 @@ struct address_t  // TODO scope id
 {
     struct hash_function {
         u32_t operator()(const address_t &key) const {
-            return sdbm((unsigned char *)&key.inner, sizeof(key.inner));
+            if(key.get_type() == AF_INET)
+                return key.inner.ipv4.sin_addr.s_addr + key.inner.ipv4.sin_port;
+            else
+                return sdbm((unsigned char *)&key.inner, sizeof(key.inner));
         }
     };
 
@@ -230,7 +233,7 @@ struct address_t  // TODO scope id
     char *get_str();
     void to_str(char *);
 
-    inline u32_t get_type() {
+    inline u32_t get_type() const {
         u32_t ret = ((sockaddr *)&inner)->sa_family;
         assert(ret == AF_INET || ret == AF_INET6);
         return ret;
@@ -292,7 +295,10 @@ template <>
 struct hash<address_t> {
     std::size_t operator()(const address_t &key) const {
         // return address_t::hash_function(k);
-        return sdbm((unsigned char *)&key.inner, sizeof(key.inner));
+        if(key.get_type() == AF_INET)
+            return key.inner.ipv4.sin_addr.s_addr + key.inner.ipv4.sin_port;
+        else
+            return sdbm((unsigned char *)&key.inner, sizeof(key.inner));
     }
 };
 }  // namespace std
