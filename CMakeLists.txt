@@ -26,7 +26,7 @@ set(SOURCE_FILES
         lib/aes_faster_c/wrapper.cpp
         my_ev.cpp
 )
-set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wno-unused-variable -Wno-unused-parameter -Wno-missing-field-initializers -O2 -g -fsanitize=address,undefined")
+set(CMAKE_CXX_FLAGS "-Wall -Wextra -Wno-unused-variable -Wno-unused-parameter -Wno-missing-field-initializers -O2 -g")
 
 add_executable(udp2raw ${SOURCE_FILES})
 target_link_libraries(udp2raw rt)
